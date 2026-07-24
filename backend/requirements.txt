@@ -1,0 +1,22 @@
+# Core
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+python-dotenv>=1.0.1
+
+# Database
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.35
+
+# AWS
+boto3>=1.35.0
+
+# MCP
+mcp>=1.27,<2
+cockroachdb-mcp-server>=0.1.0
+
+# Utilities
+httpx>=0.27.0
+tenacity>=9.0.0
+structlog>=24.4.0
