@@ -1,5 +1,18 @@
 export const API_BASE_URL = "http://localhost:8000/api";
 
+async function fetchMemory<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return fallback;
+    return await response.json() as T;
+  } catch (error) {
+    // Memory is an enhancement to the workspace. Keep the UI responsive when
+    // the optional local API is stopped or unreachable.
+    console.warn("Memory API is unavailable. Start the backend to enable live memory.", error);
+    return fallback;
+  }
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -71,9 +84,10 @@ export async function consolidateSession(
  * Fetch Working Memory (Active Context)
  */
 export async function getWorkingMemory(sessionId: string): Promise<MemoryContext> {
-  const res = await fetch(`${API_BASE_URL}/memory/working?session_id=${sessionId}`);
-  if (!res.ok) return {};
-  const data = await res.json();
+  const data = await fetchMemory<{ context?: MemoryContext }>(
+    `${API_BASE_URL}/memory/working?session_id=${sessionId}`,
+    {}
+  );
   return data.context || {};
 }
 
@@ -81,9 +95,10 @@ export async function getWorkingMemory(sessionId: string): Promise<MemoryContext
  * Fetch Semantic Memory (Knowledge Base)
  */
 export async function getSemanticMemory(userId: string = "default"): Promise<MemoryItem[]> {
-  const res = await fetch(`${API_BASE_URL}/memory/semantic?user_id=${userId}`);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await fetchMemory<{ memories?: MemoryItem[] }>(
+    `${API_BASE_URL}/memory/semantic?user_id=${userId}`,
+    {}
+  );
   return data.memories || [];
 }
 
@@ -91,8 +106,9 @@ export async function getSemanticMemory(userId: string = "default"): Promise<Mem
  * Fetch Procedural Memory (Learned Preferences)
  */
 export async function getProceduralMemory(userId: string = "default"): Promise<MemoryItem[]> {
-  const res = await fetch(`${API_BASE_URL}/memory/procedural?user_id=${userId}`);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await fetchMemory<{ memories?: MemoryItem[] }>(
+    `${API_BASE_URL}/memory/procedural?user_id=${userId}`,
+    {}
+  );
   return data.memories || [];
 }

@@ -1,79 +1,114 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, BrainCircuit, Sparkles, History, Zap, Settings, Loader2, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { 
-  sendChatMessage, 
-  consolidateSession, 
-  getWorkingMemory, 
-  getSemanticMemory, 
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowUp,
+  Bot,
+  BrainCircuit,
+  Check,
+  ChevronDown,
+  Command,
+  Database,
+  Gauge,
+  Layers3,
+  Loader2,
+  MoreHorizontal,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Plus,
+  Search,
+  Settings2,
+  Sparkles,
+  WandSparkles,
+  Zap,
+} from "lucide-react";
+import {
+  consolidateSession,
   getProceduralMemory,
+  getSemanticMemory,
+  getWorkingMemory,
+  MemoryContext,
   MemoryItem,
-  MemoryContext
+  sendChatMessage,
 } from "@/lib/api";
 
+type Message = { role: "user" | "assistant" | "system"; content: string };
+
+const suggestions = [
+  "What have you learned about me?",
+  "Summarize the context you are holding",
+  "Help me plan a focused work session",
+];
+
+function MemoryBadge({ label, value, tone }: { label: string; value: number; tone: "aqua" | "violet" | "amber" }) {
+  return (
+    <div className="memory-badge">
+      <span className={`memory-dot ${tone}`} />
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
 export default function MnemosyneChat() {
-  const [sessionId] = useState(`sess_${Math.random().toString(36).substr(2, 9)}`);
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([
-    { role: "assistant", content: "Hello! I am Mnemosyne, an agent with episodic, semantic, working, and procedural memory. How can I help you today?" }
+  const reactId = useId();
+  const sessionId = `sess_${reactId.replaceAll(":", "")}`;
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content: "Welcome back. I’m Mnemosyne—your context-aware thinking partner. I retain what matters, connect the dots, and keep the work moving.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isConsolidating, setIsConsolidating] = useState(false);
-  
-  // Memory States
+  const [showSessions, setShowSessions] = useState(true);
+  const [showMemory, setShowMemory] = useState(true);
   const [workingMemory, setWorkingMemory] = useState<MemoryContext>({});
   const [semanticMemory, setSemanticMemory] = useState<MemoryItem[]>([]);
   const [proceduralMemory, setProceduralMemory] = useState<MemoryItem[]>([]);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const refreshMemory = async () => {
+  const refreshMemory = useCallback(async () => {
     try {
-      const [wm, sm, pm] = await Promise.all([
+      const [working, semantic, procedural] = await Promise.all([
         getWorkingMemory(sessionId),
         getSemanticMemory(),
-        getProceduralMemory()
+        getProceduralMemory(),
       ]);
-      setWorkingMemory(wm);
-      setSemanticMemory(sm);
-      setProceduralMemory(pm);
-    } catch (e) {
-      console.error("Failed to fetch memory", e);
+      setWorkingMemory(working);
+      setSemanticMemory(semantic);
+      setProceduralMemory(procedural);
+    } catch (error) {
+      console.error("Failed to refresh memory", error);
     }
-  };
+  }, [sessionId]);
 
-  // Initial load
   useEffect(() => {
-    refreshMemory();
-  }, []);
+    const timer = window.setTimeout(() => void refreshMemory(), 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshMemory]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isTyping) return;
+  const handleSend = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || isTyping) return;
 
-    const userMessage = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setMessages((current) => [...current, { role: "user", content: message }]);
     setIsTyping(true);
-
     try {
-      const response = await sendChatMessage(sessionId, userMessage);
-      setMessages((prev) => [...prev, { role: "assistant", content: response }]);
-      // Refresh memory to show updated context
+      const response = await sendChatMessage(sessionId, message);
+      setMessages((current) => [...current, { role: "assistant", content: response }]);
       await refreshMemory();
-    } catch (err) {
-      setMessages((prev) => [...prev, { role: "system", content: "Error communicating with Mnemosyne." }]);
+    } catch {
+      setMessages((current) => [...current, { role: "system", content: "I couldn’t reach the memory engine. Please try again in a moment." }]);
     } finally {
       setIsTyping(false);
     }
@@ -84,193 +119,159 @@ export default function MnemosyneChat() {
     try {
       await consolidateSession(sessionId);
       await refreshMemory();
-    } catch (e) {
-      console.error("Consolidation failed", e);
+    } catch (error) {
+      console.error("Consolidation failed", error);
     } finally {
       setIsConsolidating(false);
     }
   };
 
+  const startSuggestion = (suggestion: string) => setInput(suggestion);
+
   return (
-    <div className="flex h-screen bg-[#09090b] overflow-hidden selection:bg-indigo-500/30 font-sans">
-      
-      {/* Left Pane - Chat Area */}
-      <div className="flex-1 flex flex-col relative z-10">
-        
-        {/* Header */}
-        <header className="h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex items-center px-6 justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
+    <main className="mnemosyne-shell">
+      <aside className="app-rail">
+        <div className="brand-mark"><BrainCircuit size={21} strokeWidth={2.2} /></div>
+        <nav className="rail-nav" aria-label="Primary navigation">
+          <button className="rail-action is-active" aria-label="Workspace"><WandSparkles size={19} /></button>
+          <button className="rail-action" aria-label="Memory library"><Layers3 size={19} /></button>
+          <button className="rail-action" aria-label="Search"><Search size={19} /></button>
+        </nav>
+        <div className="rail-bottom">
+          <button className="rail-action" aria-label="Settings"><Settings2 size={19} /></button>
+          <div className="avatar" aria-label="Profile">S</div>
+        </div>
+      </aside>
+
+      <AnimatePresence initial={false}>
+        {showSessions && (
+          <motion.aside className="session-sidebar" initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} transition={{ duration: 0.2 }}>
+            <div className="sidebar-title-row">
+              <span className="eyebrow">Workspace</span>
+              <button className="plain-icon" aria-label="More options"><MoreHorizontal size={18} /></button>
             </div>
-            <div>
-              <h1 className="font-heading font-medium text-zinc-100 text-lg leading-tight">Mnemosyne</h1>
-              <p className="text-xs text-zinc-500 font-medium">Agentic Memory Engine</p>
+            <div className="sidebar-scroll">
+              <button className="new-thread"><Plus size={17} /> New thread <span><Command size={12} /> K</span></button>
+              <div className="thread-group">
+                <p>Today</p>
+                <button className="thread-item selected"><span className="thread-spark"><Sparkles size={14} /></span><span>Agentic memory demo</span><MoreHorizontal size={16} /></button>
+                <button className="thread-item"><span className="thread-icon"><Bot size={14} /></span><span>Product strategy notes</span></button>
+                <button className="thread-item"><span className="thread-icon"><Bot size={14} /></span><span>Research workspace</span></button>
+              </div>
             </div>
+            <div className="sidebar-footnote">
+              <div className="storage-ring"><Database size={15} /></div>
+              <div><strong>Memory engine</strong><span>Synced just now</span></div>
+              <Check size={15} />
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      <section className="conversation-pane">
+        <header className="workspace-header">
+          <div className="header-leading">
+            <button className="drawer-toggle" onClick={() => setShowSessions((value) => !value)} aria-label={showSessions ? "Collapse left drawer" : "Open left drawer"} title={showSessions ? "Collapse left drawer" : "Open left drawer"}><PanelLeftOpen size={17} /></button>
+            <div className="crumbs"><span>Mnemosyne</span><span>/</span><b>Agentic memory demo</b><ChevronDown size={15} /></div>
           </div>
-          <div className="flex items-center gap-4 text-xs text-zinc-500">
-            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Engine Online</span>
+          <div className="header-actions">
+            <span className="live-status"><i /> Online</span>
+            <button className="right-drawer-toggle" onClick={() => setShowMemory((value) => !value)} aria-label={showMemory ? "Collapse right drawer" : "Expand right drawer"} title={showMemory ? "Collapse right drawer" : "Expand right drawer"}>
+              {showMemory ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+              <span>{showMemory ? "Collapse memory" : "Expand memory"}</span>
+            </button>
+            <button className="plain-icon" aria-label="More options"><MoreHorizontal size={20} /></button>
           </div>
         </header>
 
-        {/* Chat History */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-          <AnimatePresence initial={false}>
-            {messages.map((msg, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-5 py-4 leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-indigo-600/10 border border-indigo-500/20 text-zinc-100 shadow-[0_4px_24px_-8px_rgba(99,102,241,0.2)]"
-                      : "bg-zinc-900 border border-white/5 text-zinc-300"
-                  }`}
-                >
-                  {msg.content}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          
-          {/* Typing Indicator */}
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 flex items-center gap-2">
-                <BrainCircuit className="w-4 h-4 text-indigo-400 animate-pulse" />
-                <span className="text-sm text-zinc-500 font-medium animate-pulse">Retrieving memory...</span>
+        <div className="chat-scroll">
+          <div className="chat-column">
+            <section className="hero-intro">
+              <div className="intro-orbit"><span /><BrainCircuit size={24} /></div>
+              <div>
+                <p className="eyebrow aqua">Memory-native intelligence</p>
+                <h1>Think in context.</h1>
+                <p className="intro-copy">Every conversation grows a richer understanding of the work, the facts, and how you like to operate.</p>
               </div>
-            </motion.div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+              <div className="memory-chip-row">
+                <MemoryBadge label="Working" value={Object.keys(workingMemory).length} tone="amber" />
+                <MemoryBadge label="Knowledge" value={semanticMemory.length} tone="aqua" />
+                <MemoryBadge label="Patterns" value={proceduralMemory.length} tone="violet" />
+              </div>
+            </section>
 
-        {/* Input Area */}
-        <div className="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pt-12 shrink-0">
-          <form onSubmit={handleSend} className="max-w-4xl mx-auto relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-2xl blur opacity-30 group-focus-within:opacity-100 transition duration-500"></div>
-            <div className="relative flex items-end gap-3 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend(e);
-                  }
-                }}
-                placeholder="Message Mnemosyne..."
-                className="flex-1 max-h-32 min-h-[44px] bg-transparent resize-none border-0 focus:ring-0 text-zinc-100 placeholder:text-zinc-600 p-3 leading-relaxed"
-                rows={1}
-              />
-              <Button 
-                type="submit" 
-                disabled={!input.trim() || isTyping}
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg disabled:opacity-50 transition-all duration-300"
-              >
-                {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
+            <AnimatePresence initial={false}>
+              {messages.map((message, index) => (
+                <motion.article
+                  key={`${message.role}-${index}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                  className={`message-row ${message.role}`}
+                >
+                  {message.role !== "user" && <div className="message-avatar"><BrainCircuit size={17} /></div>}
+                  <div className="message-content">
+                    {message.role !== "user" && <div className="message-meta"><b>Mnemosyne</b><span>Memory agent</span></div>}
+                    <div className="message-bubble">{message.content}</div>
+                  </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
 
-      {/* Right Pane - Memory Inspector */}
-      <div className="hidden lg:flex w-[400px] border-l border-white/5 bg-zinc-950/50 flex-col shrink-0">
-        <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 shrink-0 bg-zinc-950">
-          <div className="flex items-center gap-3">
-            <BrainCircuit className="w-5 h-5 text-purple-400" />
-            <h2 className="font-heading font-medium text-zinc-200">Memory Inspector</h2>
+            {isTyping && (
+              <div className="message-row assistant">
+                <div className="message-avatar"><BrainCircuit size={17} /></div>
+                <div className="message-content"><div className="message-meta"><b>Mnemosyne</b><span>Searching memory</span></div><div className="typing-card"><i /><i /><i /><span>Weaving context together</span></div></div>
+              </div>
+            )}
+
+            {messages.length === 1 && (
+              <div className="suggestion-grid">
+                {suggestions.map((suggestion) => <button key={suggestion} onClick={() => startSuggestion(suggestion)}>{suggestion}<ArrowUp size={15} /></button>)}
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleConsolidate}
-            disabled={isConsolidating}
-            className="h-8 bg-zinc-900 border-zinc-800 text-xs hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            {isConsolidating ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-3 h-3 mr-2" />}
-            Consolidate
-          </Button>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-          
-          {/* Working Memory */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-amber-500 uppercase">
-              <Zap className="w-4 h-4" /> Working Context
-            </div>
-            <div className="bg-zinc-900/50 border border-amber-500/10 rounded-xl p-4 text-sm text-zinc-400 space-y-3">
-              {Object.keys(workingMemory).length === 0 ? (
-                <div className="text-xs text-zinc-600 italic">No active context.</div>
-              ) : (
-                Object.entries(workingMemory).map(([k, v]) => (
-                  <div key={k} className="space-y-1">
-                    <div className="text-xs text-amber-500/70 font-mono">{k}</div>
-                    <div className="text-zinc-300 font-medium">{v}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
 
-          {/* Procedural Memory */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-fuchsia-500 uppercase">
-              <Settings className="w-4 h-4" /> Learned Preferences
-            </div>
-            <div className="bg-zinc-900/50 border border-fuchsia-500/10 rounded-xl p-4 text-sm text-zinc-400 space-y-3">
-              {proceduralMemory.length === 0 ? (
-                <div className="text-xs text-zinc-600 italic">No patterns learned yet. Consolidate a session to extract them.</div>
-              ) : (
-                proceduralMemory.map(pm => (
-                  <div key={pm.id} className="flex items-start gap-2">
-                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-fuchsia-500 shrink-0"></div>
-                    <div>
-                      <span>{pm.pattern}</span>
-                      <div className="text-[10px] text-fuchsia-500/50 uppercase mt-0.5">{pm.pattern_type}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* Semantic Memory */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-500 uppercase">
-              <History className="w-4 h-4" /> Semantic Knowledge
-            </div>
-            <div className="bg-zinc-900/50 border border-blue-500/10 rounded-xl p-4 text-sm text-zinc-400 space-y-3">
-              {semanticMemory.length === 0 ? (
-                <div className="text-xs text-zinc-600 italic">No knowledge stored yet.</div>
-              ) : (
-                semanticMemory.map(sm => (
-                  <div key={sm.id} className="pl-3 border-l-2 border-blue-500/30 text-zinc-300">
-                    {sm.content}
-                    <div className="text-[10px] text-zinc-500 flex justify-between mt-1">
-                      <span>{sm.category || "general"}</span>
-                      <span className="text-blue-500/50">imp: {sm.importance?.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
+        <div className="composer-zone">
+          <form className="composer" onSubmit={handleSend}>
+            <textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void handleSend(event); } }}
+              placeholder="Ask anything. I remember the important parts."
+              rows={1}
+            />
+            <div className="composer-tools"><button type="button" className="add-context" aria-label="Add context"><Plus size={18} /></button><span>↵ Send</span><button type="submit" className="send-button" disabled={!input.trim() || isTyping} aria-label="Send message">{isTyping ? <Loader2 size={19} className="spin" /> : <ArrowUp size={19} />}</button></div>
+          </form>
+          <p className="composer-note">Mnemosyne may use your stored memory to make responses more useful.</p>
         </div>
-      </div>
-      
-    </div>
+      </section>
+
+      <AnimatePresence initial={false}>
+        {showMemory && (
+          <motion.aside className="memory-dock" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }} transition={{ duration: 0.24 }}>
+            <div className="dock-header"><div><p className="eyebrow">Live system</p><h2>Memory map</h2></div><button className="plain-icon" onClick={() => setShowMemory(false)} aria-label="Collapse right drawer" title="Collapse right drawer"><PanelRightClose size={18} /></button></div>
+            <div className="dock-scroll">
+              <div className="system-health"><div className="pulse-visual"><span /><BrainCircuit size={23} /></div><div><b>All systems receptive</b><p>Context updates in real time</p></div><Gauge size={18} /></div>
+              <div className="memory-section">
+                <div className="section-label amber"><Zap size={15} /> Active context <span>{Object.keys(workingMemory).length}</span></div>
+                <div className="context-card">{Object.keys(workingMemory).length ? Object.entries(workingMemory).map(([key, value]) => <div className="context-entry" key={key}><span>{key.replaceAll("_", " ")}</span><b>{value}</b></div>) : <p>Conversation context will surface here as you work.</p>}</div>
+              </div>
+              <div className="memory-section">
+                <div className="section-label aqua"><Database size={15} /> Knowledge <span>{semanticMemory.length}</span></div>
+                <div className="memory-list">{semanticMemory.length ? semanticMemory.slice(0, 3).map((memory) => <div className="memory-entry" key={memory.id}><i /><div><b>{memory.content}</b><span>{memory.category || "general knowledge"}</span></div></div>) : <p>Facts and durable insights will collect here.</p>}</div>
+              </div>
+              <div className="memory-section">
+                <div className="section-label violet"><Layers3 size={15} /> Learned patterns <span>{proceduralMemory.length}</span></div>
+                <div className="memory-list">{proceduralMemory.length ? proceduralMemory.slice(0, 2).map((memory) => <div className="memory-entry pattern" key={memory.id}><i /><div><b>{memory.pattern}</b><span>{memory.pattern_type || "preference"}</span></div></div>) : <p>Consolidate a session to identify preferences and patterns.</p>}</div>
+              </div>
+            </div>
+            <button className="consolidate-button" onClick={handleConsolidate} disabled={isConsolidating}>{isConsolidating ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />} {isConsolidating ? "Consolidating..." : "Consolidate this session"}</button>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+    </main>
   );
 }
