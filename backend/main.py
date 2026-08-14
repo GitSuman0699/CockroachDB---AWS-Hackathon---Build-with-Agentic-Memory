@@ -48,7 +48,9 @@ class MemoryResponse(BaseModel):
 
 # --- Routes ---
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 def health_check():
     return {"status": "healthy", "service": "Mnemosyne"}
 
