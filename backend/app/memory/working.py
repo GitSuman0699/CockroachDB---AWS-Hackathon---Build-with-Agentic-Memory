@@ -111,13 +111,16 @@ def remove_context(session_id: str, key: str):
         )
 
 
-def clear_session(session_id: str):
+def clear_session(session_id: str, _cur=None):
     """Clear all working memory for a session."""
-    with get_cursor() as cur:
-        cur.execute(
-            "DELETE FROM working_memory WHERE session_id = %s",
-            (session_id,)
-        )
+    query = "DELETE FROM working_memory WHERE session_id = %s"
+    args = (session_id,)
+    
+    if _cur:
+        _cur.execute(query, args)
+    else:
+        with get_cursor() as cur:
+            cur.execute(query, args)
     logger.debug(f"Cleared working memory for session {session_id[:8]}...")
 
 

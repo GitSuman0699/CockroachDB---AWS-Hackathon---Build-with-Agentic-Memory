@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from app.agent import MnemosyneAgent
 from app.memory import working, semantic, procedural, episodic
+from mcp_server import mcp
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -18,15 +19,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Mnemosyne API")
 
-# Allow frontend to connect
+# Allow frontend to connect (support localhost, Vercel deployments, and custom domains)
 app.add_middleware(
     CORSMiddleware,
-    # Next can choose a different local port when 3000 is already occupied.
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount the FastMCP SSE application
+app.mount("/mcp", mcp.sse_app())
 
 
 # --- Models ---

@@ -52,6 +52,29 @@ def get_cursor():
             cur.close()
 
 
+@contextmanager
+def transaction_cursor():
+    """
+    Get a cursor for an explicit transaction block.
+    Commits on success, rollbacks on exception.
+    """
+    pool = get_pool()
+    conn = pool.getconn()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            yield cur
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+    finally:
+        pool.putconn(conn)
+
+
 # ────────────────────────────────────────────────────────────
 # Schema — all tables for the 4 memory types + consolidation
 # ────────────────────────────────────────────────────────────

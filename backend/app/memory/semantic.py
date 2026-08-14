@@ -20,6 +20,7 @@ def store_knowledge(
     category: str = "",
     importance: float = 0.5,
     metadata: dict = None,
+    _cur=None,
 ) -> str:
     """
     Store a piece of knowledge in semantic memory.
@@ -39,14 +40,17 @@ def store_knowledge(
     embedding = embed_text(content)
     embedding_vec = format_vector(embedding)
     
-    with get_cursor() as cur:
-        cur.execute(
-            """INSERT INTO semantic_memories
+    query = """INSERT INTO semantic_memories
                (id, user_id, content, source, category, embedding, importance, metadata)
-               VALUES (%s, %s, %s, %s, %s, %s::VECTOR(1024), %s, %s)""",
-            (knowledge_id, user_id, content, source, category,
-             embedding_vec, importance, json.dumps(metadata or {}))
-        )
+               VALUES (%s, %s, %s, %s, %s, %s::VECTOR(1024), %s, %s)"""
+    args = (knowledge_id, user_id, content, source, category,
+            embedding_vec, importance, json.dumps(metadata or {}))
+    
+    if _cur:
+        _cur.execute(query, args)
+    else:
+        with get_cursor() as cur:
+            cur.execute(query, args)
     
     logger.debug(f"Stored semantic memory: {content[:50]}...")
     return knowledge_id

@@ -1,4 +1,7 @@
-export const API_BASE_URL = "http://localhost:8000/api";
+export const API_BASE_URL = 
+  process.env.NEXT_PUBLIC_API_URL 
+    ? (process.env.NEXT_PUBLIC_API_URL.endsWith("/api") ? process.env.NEXT_PUBLIC_API_URL : `${process.env.NEXT_PUBLIC_API_URL}/api`)
+    : "http://localhost:8000/api";
 
 async function fetchMemory<T>(url: string, fallback: T): Promise<T> {
   try {

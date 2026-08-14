@@ -19,6 +19,7 @@ def store_pattern(
     user_id: str = "default",
     confidence: float = 0.5,
     metadata: dict = None,
+    _cur=None,
 ) -> str:
     """
     Store a learned pattern or preference.
@@ -37,14 +38,17 @@ def store_pattern(
     embedding = embed_text(pattern)
     embedding_vec = format_vector(embedding)
     
-    with get_cursor() as cur:
-        cur.execute(
-            """INSERT INTO procedural_memories
+    query = """INSERT INTO procedural_memories
                (id, user_id, pattern_type, pattern, embedding, confidence, metadata)
-               VALUES (%s, %s, %s, %s, %s::VECTOR(1024), %s, %s)""",
-            (pattern_id, user_id, pattern_type, pattern,
-             embedding_vec, confidence, json.dumps(metadata or {}))
-        )
+               VALUES (%s, %s, %s, %s, %s::VECTOR(1024), %s, %s)"""
+    args = (pattern_id, user_id, pattern_type, pattern,
+            embedding_vec, confidence, json.dumps(metadata or {}))
+    
+    if _cur:
+        _cur.execute(query, args)
+    else:
+        with get_cursor() as cur:
+            cur.execute(query, args)
     
     logger.debug(f"Stored procedural memory ({pattern_type}): {pattern[:50]}...")
     return pattern_id

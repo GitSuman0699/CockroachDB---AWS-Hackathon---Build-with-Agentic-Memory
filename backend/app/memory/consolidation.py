@@ -15,7 +15,7 @@ Consolidation types:
 import json
 import logging
 from datetime import datetime, timedelta
-from app.database import get_cursor
+from app.database import get_cursor, transaction_cursor
 from app.embeddings import embed_text, format_vector
 from app.llm import chat
 from app.memory import episodic, semantic, procedural, working
@@ -82,23 +82,14 @@ Conversation:
                 if fact and fact != "NONE":
                     facts.append(fact)
         
-        # Store each fact as semantic memory
-        for fact in facts:
-            mid = semantic.store_knowledge(
-                content=fact,
-                user_id=user_id,
-                source=f"consolidated:session:{session_id[:8]}",
-                category="conversation_knowledge",
-                importance=0.6,
-                metadata={"consolidated_from": session_id},
-            )
-            results["semantic_created"].append({"id": mid, "content": fact})
+        
         
         logger.info(f"Extracted {len(facts)} facts from session {session_id[:8]}")
         
     except Exception as e:
         logger.error(f"Knowledge extraction failed: {e}")
-    
+        facts = []
+        
     # Step 2: Extract user preferences/patterns using LLM
     pattern_prompt = """Analyze this conversation and extract any USER PREFERENCES or PATTERNS.
 For example:
@@ -114,6 +105,7 @@ If no patterns found, return "NONE".
 Conversation:
 """ + conv_text[:4000]
     
+    procedural_items_to_store = []
     try:
         pattern_response = chat(
             messages=[{"role": "user", "content": pattern_prompt}],
@@ -125,7 +117,6 @@ Conversation:
         for line in pattern_response.strip().split("\n"):
             line = line.strip()
             if line.startswith("PATTERN"):
-                # Parse "PATTERN [type]: description"
                 try:
                     bracket_start = line.index("[")
                     bracket_end = line.index("]")
@@ -136,36 +127,66 @@ Conversation:
                         ptype = "preference"
                     
                     if description:
-                        mid = procedural.store_pattern(
-                            pattern=description,
-                            pattern_type=ptype,
-                            user_id=user_id,
-                            confidence=0.4,  # Low initial confidence
-                            metadata={"consolidated_from": session_id},
-                        )
-                        results["procedural_created"].append({
-                            "id": mid, "type": ptype, "pattern": description
-                        })
+                        procedural_items_to_store.append({"type": ptype, "description": description})
                 except (ValueError, IndexError):
                     pass
-        
-        logger.info(f"Extracted {len(results['procedural_created'])} patterns from session {session_id[:8]}")
+                    
+        logger.info(f"Extracted {len(procedural_items_to_store)} patterns from session {session_id[:8]}")
         
     except Exception as e:
         logger.error(f"Pattern extraction failed: {e}")
-    
-    # Step 3: Clean up working memory
-    working.clear_session(session_id)
-    results["working_cleaned"] = True
-    
-    # Log consolidation
-    _log_consolidation(
-        source_type="episodic",
-        target_type="semantic",
-        consolidation_type="promote",
-        reason=f"Session {session_id[:8]} consolidation: {len(results['semantic_created'])} facts, {len(results['procedural_created'])} patterns",
-        metadata=results,
-    )
+        
+    try:
+        # --- ACID Transaction Block ---
+        # We wrap all insertions, deletions, and logging in a single CockroachDB transaction
+        # to guarantee that if the process fails midway, memory isn't corrupted or partially duplicated.
+        with transaction_cursor() as cur:
+            # Store each fact as semantic memory
+            for fact in facts:
+                mid = semantic.store_knowledge(
+                    content=fact,
+                    user_id=user_id,
+                    source=f"consolidated:session:{session_id[:8]}",
+                    category="conversation_knowledge",
+                    importance=0.6,
+                    metadata={"consolidated_from": session_id},
+                    _cur=cur,
+                )
+                results["semantic_created"].append({"id": mid, "content": fact})
+            
+            # Store patterns as procedural memories
+            for p in procedural_items_to_store:
+                mid = procedural.store_pattern(
+                    pattern=p["description"],
+                    pattern_type=p["type"],
+                    user_id=user_id,
+                    confidence=0.4,
+                    metadata={"consolidated_from": session_id},
+                    _cur=cur,
+                )
+                results["procedural_created"].append({
+                    "id": mid, "type": p["type"], "pattern": p["description"]
+                })
+            
+            # Step 3: Clean up working memory within the same transaction
+            working.clear_session(session_id, _cur=cur)
+            results["working_cleaned"] = True
+            
+            # Log consolidation
+            _log_consolidation(
+                source_type="episodic",
+                target_type="semantic",
+                consolidation_type="promote",
+                reason=f"Session {session_id[:8]} consolidation: {len(results['semantic_created'])} facts, {len(results['procedural_created'])} patterns",
+                metadata=results,
+                _cur=cur,
+            )
+            
+        logger.info(f"Successfully committed consolidation transaction for session {session_id[:8]}")
+        
+    except Exception as e:
+        logger.error(f"Pattern extraction or transaction failed: {e}")
+        # The transaction will automatically rollback due to transaction_cursor()
     
     return results
 
@@ -392,13 +413,17 @@ def _log_consolidation(
     consolidation_type: str,
     reason: str = "",
     metadata: dict = None,
+    _cur=None,
 ):
     """Internal: log a consolidation event."""
-    with get_cursor() as cur:
-        cur.execute(
-            """INSERT INTO consolidation_log 
+    query = """INSERT INTO consolidation_log 
                (source_type, target_type, consolidation_type, reason, metadata)
-               VALUES (%s, %s, %s, %s, %s)""",
-            (source_type, target_type, consolidation_type, reason,
+               VALUES (%s, %s, %s, %s, %s)"""
+    args = (source_type, target_type, consolidation_type, reason,
              json.dumps(metadata or {}, default=str))
-        )
+    
+    if _cur:
+        _cur.execute(query, args)
+    else:
+        with get_cursor() as cur:
+            cur.execute(query, args)
