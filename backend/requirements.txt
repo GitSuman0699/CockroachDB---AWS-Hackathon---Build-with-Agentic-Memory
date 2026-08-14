@@ -5,8 +5,8 @@ sse-starlette>=2.1.0
 starlette>=0.38.0
 python-multipart>=0.0.9
 
-# Model Context Protocol (MCP) — FastMCP requires >= 1.28.0
-mcp>=1.28.0
+# Model Context Protocol (MCP) — Pinned to 1.28.1 (2.0.0 has breaking changes)
+mcp==1.28.1
 
 # Database (CockroachDB & PostgreSQL)
 psycopg2-binary>=2.9.9
