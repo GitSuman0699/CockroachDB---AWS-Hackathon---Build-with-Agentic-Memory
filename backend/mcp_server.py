@@ -17,9 +17,10 @@ from app.memory import semantic, procedural
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("mnemosyne-mcp")
 
-# Initialize FastMCP Server (disable DNS rebinding protection so remote requests to Render domain are accepted)
+# Initialize FastMCP Server (disable DNS rebinding protection and set streamable_http_path for cloud deployment)
 mcp = FastMCP(
     "mnemosyne-amaas",
+    streamable_http_path="/",
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False)
 )
 

@@ -4,6 +4,7 @@ Exposes the agent and memory engine to the frontend via REST API.
 """
 
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -17,7 +18,13 @@ from mcp_server import mcp
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Mnemosyne API")
+# FastAPI Lifespan to run FastMCP Streamable HTTP Session Manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp.session_manager.run():
+        yield
+
+app = FastAPI(title="Mnemosyne API", lifespan=lifespan)
 
 # Allow frontend to connect (support localhost, Vercel deployments, and custom domains)
 app.add_middleware(
@@ -28,8 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount the FastMCP SSE application
-app.mount("/mcp", mcp.sse_app())
+# Mount FastMCP applications (Streamable HTTP at /mcp and SSE at /mcp/sse)
+app.mount("/mcp/sse", mcp.sse_app())
+app.mount("/mcp", mcp.streamable_http_app())
 
 
 # --- Models ---
