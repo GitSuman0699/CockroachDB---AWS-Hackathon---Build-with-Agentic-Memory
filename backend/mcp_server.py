@@ -4,6 +4,7 @@ import asyncio
 from typing import Optional, List, Dict, Any
 import os
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from dotenv import load_dotenv
 
 # Load environment from the specific backend directory, regardless of where Claude runs this
@@ -16,8 +17,11 @@ from app.memory import semantic, procedural
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("mnemosyne-mcp")
 
-# Initialize FastMCP Server
-mcp = FastMCP("mnemosyne-amaas")
+# Initialize FastMCP Server (disable DNS rebinding protection so remote requests to Render domain are accepted)
+mcp = FastMCP(
+    "mnemosyne-amaas",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False)
+)
 
 @mcp.tool()
 def store_semantic_memory(content: str, user_id: str = "default", category: str = "general") -> str:

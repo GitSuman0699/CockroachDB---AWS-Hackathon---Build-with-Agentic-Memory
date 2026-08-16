@@ -104,14 +104,14 @@ Mnemosyne is architected for zero-friction cloud deployment:
    - `AWS_SECRET_ACCESS_KEY` = *(Your AWS Secret Key)*
    - `BEDROCK_EMBEDDING_MODEL_ID` = `amazon.titan-embed-text-v2:0`
 
-Your backend will be live at `https://<your-backend-name>.onrender.com` with the FastMCP SSE endpoint at `https://<your-backend-name>.onrender.com/mcp/sse`!
+Your backend will be live at `https://cockroachdb-aws-hackathon-build-with.onrender.com` with the FastMCP SSE endpoint at `https://cockroachdb-aws-hackathon-build-with.onrender.com/mcp/sse`!
 
 ### 2. Deploy Frontend Web Playground to Vercel (1-Click)
 1. Log into [Vercel.com](https://vercel.com) and click **Add New > Project**.
 2. Select your GitHub repository.
 3. Set **Root Directory** to `frontend`.
 4. Add the Environment Variable:
-   - `NEXT_PUBLIC_API_URL` = `https://<your-backend-name>.onrender.com`
+   - `NEXT_PUBLIC_API_URL` = `https://cockroachdb-aws-hackathon-build-with.onrender.com`
 5. Click **Deploy**.
 
 ---
@@ -125,7 +125,7 @@ Add this to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "mnemosyne": {
-      "serverUrl": "https://<your-backend-name>.onrender.com/mcp/sse"
+      "serverUrl": "https://cockroachdb-aws-hackathon-build-with.onrender.com/mcp/sse"
     }
   }
 }
