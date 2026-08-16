@@ -31,11 +31,76 @@ In a real-world enterprise setting, developers do not want to explicitly type *"
 
 Once that system prompt is set, the AI will autonomously query CockroachDB in the background for every request without the user ever having to ask!
 
-## 🏗️ Architecture Stack
-- **Database**: CockroachDB Serverless (Relational + Vector Search)
-- **AI / Embeddings**: AWS Bedrock (Amazon Titan V2 for embeddings)
-- **Integration Layer**: FastMCP (Model Context Protocol)
-- **Backend**: Python
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Clients["🌐 Poly-Agent Client Ecosystem (BYOA)"]
+        A1["Antigravity IDE"]
+        A2["Claude Desktop"]
+        A3["Cursor / Windsurf"]
+        A4["Claude Code CLI"]
+        A5["Mnemosyne Web Playground<br/>(Next.js 15 + Tailwind)"]
+    end
+
+    subgraph Gateway["⚡ Transport & Integration Gateway"]
+        MCP["Model Context Protocol (FastMCP)<br/>Remote SSE & Streamable HTTP"]
+        API["FastAPI REST Backend<br/>CORS + Lifespan Manager"]
+    end
+
+    subgraph MemoryEngine["🧠 4-Tier Cognitive Memory Engine"]
+        WM["1. Working Memory<br/>(Real-time Context & TTL)"]
+        EM["2. Episodic Memory<br/>(Chronological Event Log)"]
+        CE["Consolidation Engine<br/>('Dreaming' Pipeline)"]
+        SM["3. Semantic Memory<br/>(Durable Facts & Knowledge)"]
+        PM["4. Procedural Memory<br/>(Learned Rules & Conventions)"]
+    end
+
+    subgraph AWS["☁️ AWS Bedrock Intelligence"]
+        TITAN["Amazon Titan Embeddings V2<br/>(1024-dimensional vectors)"]
+        CLAUDE["Anthropic Claude 3.5<br/>(Autonomous Extraction)"]
+    end
+
+    subgraph CRDB["🛡️ CockroachDB Serverless Core"]
+        VEC["Distributed Vector Index<br/>Native Cosine Distance (<=>)"]
+        ACID["Distributed ACID Transactions<br/>(BEGIN / COMMIT Isolation)"]
+        REL["Relational & JSONB Storage<br/>(Audit Logs & Metadata)"]
+    end
+
+    %% Client Connections
+    A1 & A2 & A3 & A4 -->|MCP Protocol| MCP
+    A5 -->|REST API| API
+
+    %% Gateway to Engine
+    MCP & API --> WM
+    MCP & API --> EM
+    MCP & API -->|Vector Query <=>| SM
+    MCP & API -->|Preference Match <=>| PM
+
+    %% Consolidation Pipeline
+    WM & EM -->|Promote Logs| CE
+    CE -->|Synthesize Memories| CLAUDE
+    CE -->|Embed Text| TITAN
+    TITAN -->|1024-dim Vector| SM
+    TITAN -->|1024-dim Vector| PM
+
+    %% Persistence to CockroachDB
+    SM & PM -->|Store Vectors| VEC
+    CE -->|Atomic Batch Updates| ACID
+    EM & WM -->|Persist Records| REL
+
+    classDef client fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef gateway fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+    classDef engine fill:#312e81,stroke:#a855f7,stroke-width:2px,color:#f8fafc;
+    classDef aws fill:#451a03,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef crdb fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+
+    class A1,A2,A3,A4,A5 client;
+    class MCP,API gateway;
+    class WM,EM,CE,SM,PM engine;
+    class TITAN,CLAUDE aws;
+    class VEC,ACID,REL crdb;
+```
 
 ---
 
