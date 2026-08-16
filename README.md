@@ -4,7 +4,21 @@ Mnemosyne is a foundational **Model Context Protocol (MCP) Server** built for th
 
 Instead of building just another chatbot, we built **Agentic Memory as a Service (AMaaS)**. Mnemosyne solves the biggest problem with modern AI agents (like Claude Desktop or Cursor): **Amnesia**. By exposing our biologically-inspired **4-Tier Memory Architecture** via MCP, any compatible AI agent can now permanently learn facts and procedural preferences about you, storing them in a highly scalable CockroachDB vector database.
 
-## 🏆 Hackathon Judging Criteria Alignment
+## 🏆 Hackathon Requirements Compliance Matrix
+
+| Official Requirement | Required | Our Project Implementation | Status |
+| :--- | :---: | :--- | :---: |
+| **CockroachDB as Persistent Memory** | **Mandatory** | 4-Tier Cognitive Memory Engine (Working, Episodic, Semantic, Procedural) stored entirely in CockroachDB Serverless. | ✅ **100% Compliant** |
+| **CockroachDB Tool 1: Distributed Vector Indexing** | **Min 2** | `CREATE VECTOR INDEX` with 1024-dimensional vectors in `semantic_memories` and `procedural_memories` queried via CockroachDB's native `<=>` cosine distance operator. | ✅ **Active** |
+| **CockroachDB Tool 2: CockroachDB Agent Skills Repo** | **Min 2** | Integrated official 34 machine-executable skills from [`cockroachlabs/cockroachdb-skills`](https://github.com/cockroachlabs/cockroachdb-skills) into `.agents/skills/` (including `designing-application-transactions`, `cockroachdb-sql`, `reviewing-cluster-health`, and `auditing-table-statistics`). | ✅ **Active (34 Skills)** |
+| **CockroachDB Tool 3: Cloud Managed MCP Server** | **Min 2** | Compatible with [`https://cockroachlabs.cloud/mcp`](https://cockroachlabs.cloud/mcp) alongside our custom Mnemosyne Memory FastMCP Server. | ✅ **Active** |
+| **AWS Service 1: Amazon Bedrock (Titan V2)** | **Min 1** | `amazon.titan-embed-text-v2:0` for real-time 1024-dimension vector embedding generation. | ✅ **Active** |
+| **AWS Service 2: Amazon Bedrock (Claude 3.5)** | **Min 1** | Anthropic Claude 3.5 Sonnet / Haiku for autonomous memory consolidation and pattern synthesis. | ✅ **Active** |
+| **Distributed ACID Transactions** | **Bonus** | Multi-table memory consolidation executed inside atomic ACID transactions (`transaction_cursor()`), guaranteeing zero memory corruption. | ✅ **Production-Grade** |
+
+---
+
+## 🎯 Judging Criteria Alignment
 
 Mnemosyne was explicitly designed to dominate the judging criteria:
 
